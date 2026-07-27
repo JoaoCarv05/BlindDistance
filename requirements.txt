@@ -1,0 +1,25 @@
+# BlindDistance — Stereo Vision Dependencies
+# Python 3.12+
+
+# Core
+opencv-python>=4.10.0
+numpy>=2.0.0
+
+# AI / Object Detection
+ultralytics>=8.4.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Audio
+pyttsx3>=2.90
+pygame>=2.6.0
+
+# Utilities
+scipy>=1.10.0
+matplotlib>=3.7.0
+pillow>=10.0.0
+PyYAML>=6.0
+requests>=2.30.0
+
+# Optional: install for smoother depth maps (WLS filter)
+# pip install opencv-contrib-python
