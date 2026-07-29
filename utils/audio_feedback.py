@@ -23,6 +23,8 @@ class AudioFeedback:
         # Rate limiting to prevent spamming the same warning repeatedy
         self.last_warning_time = 0.0
         self.warning_cooldown = 3.0 # Speak at most once every 3 seconds
+        # Per-object cooldown: e.g., 'person' won't block 'chair' from speaking
+        self._object_cooldowns = {}  # {cooldown_key: last_spoken_time}
 
         # Rate limiting for beeps (max 5 per second to avoid overloading pygame)
         self.last_beep_time = 0.0
@@ -31,12 +33,34 @@ class AudioFeedback:
         # We also want a generic beep for low-level proximity alerts
         # self.beep_sound = self._generate_beep() 
 
-    def speak(self, text, force=False):
-        """ Queue text to be spoken. If force=True, bypasses the cooldown limit. """
+    def speak(self, text, force=False, cooldown_key=None):
+        """ Queue text to be spoken. If force=True, bypasses the cooldown limit.
+        
+        Args:
+            text: The text to speak.
+            force: If True, bypasses cooldown entirely.
+            cooldown_key: If provided, uses a per-key cooldown timer instead of
+                          the global one. E.g., cooldown_key='person' won't block
+                          'chair' from speaking.
+        """
         current_time = time.time()
         
-        # Always allow forced messages or messages if the cooldown has passed
-        if force or (current_time - self.last_warning_time > self.warning_cooldown):
+        if force:
+            allowed = True
+        elif cooldown_key:
+            # Per-object cooldown: each key has its own timer
+            last_time = self._object_cooldowns.get(cooldown_key, 0.0)
+            allowed = (current_time - last_time > self.warning_cooldown)
+            if allowed:
+                self._object_cooldowns[cooldown_key] = current_time
+        else:
+            # Global cooldown (original behavior)
+            allowed = (current_time - self.last_warning_time > self.warning_cooldown)
+
+        if allowed:
+            if not cooldown_key:
+                self.last_warning_time = current_time
+            
             # Drain the queue so we say the newest thing instead of lagging behind
             while not self.message_queue.empty():
                 try:
@@ -45,7 +69,6 @@ class AudioFeedback:
                     break
 
             self.message_queue.put(text)
-            self.last_warning_time = current_time
 
     def beep(self, frequency=800, duration_ms=200):
         """ Play a simple tone. Higher frequency or shorter duration feels more urgent. """
