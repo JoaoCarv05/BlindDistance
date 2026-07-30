@@ -1,31 +1,3 @@
-"""
-debug_floor_drop.py — Diagnostic tool to investigate depth sensor behavior
-for downward hazards (holes, stairs going down, floor drops).
-
-PURPOSE:
-  The main BlindDistance system only warns for CLOSE objects (< 1000mm).
-  A hole/staircase going DOWN produces a LARGER depth reading or 0 (no return).
-  This script visualizes and logs what the sensor actually reports so we can
-  determine the right threshold for void detection.
-
-  Updated for STEREO VISION (two USB webcams) — no longer uses OpenNI/Orbbec.
-
-HOW TO USE:
-  1. Run stereo_calibration.py first to generate calibration data
-  2. Run this script: python debug_floor_drop.py
-  3. Point the camera at flat floor first — note the "Floor Mean" value
-  4. Then point it at stairs going down, a ledge, or a hole
-  5. Watch the "VOID RATIO" and "Floor Mean" change
-  6. Press 's' to take a snapshot (saves depth CSV + screenshot)
-  7. Press 'c' to calibrate floor baseline (stores current floor mean as reference)
-  8. Press 'q' to quit
-
-OUTPUT:
-  - Live annotated view: green = normal floor, red = possible void, blue = no-data
-  - Console stats every 0.3s: floor mean, max, void ratio, delta from baseline
-  - Snapshots saved to debug_snapshots/ folder
-"""
-
 import cv2
 import numpy as np
 import os
@@ -37,20 +9,13 @@ from stereo_camera import StereoCamera
 PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
 SNAPSHOT_DIR = os.path.join(PROJECT_PATH, "debug_snapshots")
 CALIBRATION_FILE = os.path.join(PROJECT_PATH, "stereo_calibration_data.xml")
-
-# Grid sampling (matching main.py settings)
 GRID_STEP_Y = 20
 GRID_STEP_X = 20
 START_Y, START_X = 40, 20
-
-# Floor region: bottom third of the depth frame (where the floor typically is)
-# When tilted slightly downward, the lower rows see the ground ahead
-FLOOR_REGION_RATIO = 0.33  # bottom 33% of the frame
-
-# Void detection parameters (these are what we're investigating)
-VOID_DEPTH_MULTIPLIER = 1.5   # depth > floor_mean * this = potential void
-VOID_RATIO_THRESHOLD = 0.20   # if >20% of floor pixels are "void", warn
-NO_RETURN_THRESHOLD = 0       # sensor returns 0 when nothing is in range
+FLOOR_REGION_RATIO = 0.33 
+VOID_DEPTH_MULTIPLIER = 1.5
+VOID_RATIO_THRESHOLD = 0.20
+NO_RETURN_THRESHOLD = 0
 
 # ─── Initialization ──────────────────────────────────────────────────────────
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
@@ -65,24 +30,14 @@ floor_start_row = int(H * (1.0 - FLOOR_REGION_RATIO))
 print(f"Floor region: rows {floor_start_row}–{H} (bottom {FLOOR_REGION_RATIO*100:.0f}%)")
 
 # Calibration state
-floor_baseline = None  # Will be set when user presses 'c'
+floor_baseline = None
 snapshot_count = 0
 last_print_time = 0
 
 # ─── Helper functions ────────────────────────────────────────────────────────
 
 def analyze_floor(depth_img):
-    """Analyze the floor region of a depth frame.
-    
-    Returns a dict with:
-      - floor_region: the raw depth sub-array for the floor
-      - valid_mask: boolean mask of valid (non-zero) pixels
-      - valid_depths: 1D array of valid depth values
-      - floor_mean, floor_median, floor_min, floor_max: stats
-      - void_mask: boolean mask of pixels that look like a drop
-      - void_ratio: fraction of floor pixels that look like a void
-      - no_return_ratio: fraction of pixels with 0 (no depth return)
-    """
+
     floor_region = depth_img[floor_start_row:, :]
     
     valid_mask = floor_region > 0

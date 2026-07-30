@@ -5,21 +5,6 @@ import numpy as np
 
 
 class DataRecorder:
-    """
-    Saves paired depth maps, color images, and grid distance arrays
-    into label-organized directories for AI training data collection.
-
-    Directory structure:
-        dataset/
-        ├── <label>/
-        │   ├── depth/   <-- .npy files with uint16 480x640 depth in mm
-        │   ├── color/   <-- .png files with BGR color image
-        │   └── grid/    <-- .npy files with uint16 1D grid distance array
-
-    Controls (handled externally in main loop):
-        Keys 1-5  → select label
-        r         → toggle recording on/off
-    """
 
     LABELS = ['clear', 'person', 'wall', 'furniture', 'other_obstacle']
     LABEL_KEYS = {ord('1'): 0, ord('2'): 1, ord('3'): 2, ord('4'): 3, ord('5'): 4}
@@ -56,18 +41,7 @@ class DataRecorder:
         grid_distances: list,
         label: str,
     ) -> bool:
-        """
-        Save a single frame if the rate-limit interval has elapsed.
 
-        Parameters
-        ----------
-        depth_img       : 480×640 uint16 numpy array (depth in mm)
-        color_img       : 480×640×3 uint8 numpy array (BGR)
-        grid_distances  : list of uint16 distances sampled at grid points
-        label           : one of DataRecorder.LABELS
-
-        Returns True if the frame was actually written, False if skipped.
-        """
         now = time.monotonic()
         if now - self._last_save_time < self.save_interval:
             return False

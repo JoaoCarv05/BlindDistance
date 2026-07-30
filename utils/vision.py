@@ -11,14 +11,7 @@ class ObstacleDetector:
         print("YOLO model loaded.")
 
     def process_frame(self, color_img, depth_img, confidence_threshold=0.5):
-        """
-        Runs object detection on the color image, then checks the depth image
-        to find how far away those objects are.
-        
-        Returns:
-            annotated_img: The BGR image with bounding boxes drawn on it.
-            threats: A list of dicts containing {'label', 'distance_mm', 'box'}
-        """
+
         # 1. Run inference on the color image
         results = self.model(color_img, verbose=False)
         result = results[0] # Get the first (and only) image result
@@ -40,9 +33,6 @@ class ObstacleDetector:
             x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
             
             # 3. Calculate Distance
-            # Average valid depth values over a small patch around the bounding box center.
-            # Single-pixel sampling is unreliable because depth sensors frequently
-            # return 0 (invalid) at isolated pixels due to noise or edge effects.
             center_x = (x1 + x2) // 2
             center_y = (y1 + y2) // 2
 

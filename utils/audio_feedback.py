@@ -9,18 +9,16 @@ class AudioFeedback:
     def __init__(self):
         # Initialize TTS Engine
         self.tts_engine = pyttsx3.init()
-        self.tts_engine.setProperty('rate', 180) # Speed up speech slightly
+        self.tts_engine.setProperty('rate', 180)
         
-        # Initialize Pygame for beeps
         pygame.mixer.init()
         
-        # Threading and Queues for non-blocking audio
         self.message_queue = queue.Queue()
         self.running = True
         self.audio_thread = threading.Thread(target=self._audio_loop, daemon=True)
         self.audio_thread.start()
         
-        # Rate limiting to prevent spamming the same warning repeatedy
+
         self.last_warning_time = 0.0
         self.warning_cooldown = 3.0 # Speak at most once every 3 seconds
 
