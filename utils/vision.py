@@ -3,12 +3,40 @@ import numpy as np
 from ultralytics import YOLO
 
 class ObstacleDetector:
-    def __init__(self, model_size='yolov8n.pt'):
-        """ Initialize the YOLOv8 model for object detection. """
+    # Curated whitelist of COCO classes relevant for assistive navigation.
+    # YOLOv8n detects all 80 COCO classes; we filter to only report useful ones.
+    DEFAULT_ASSISTIVE_CLASSES = {
+        # People
+        'person',
+        # Vehicles (outdoor navigation)
+        'bicycle', 'car', 'motorcycle', 'bus', 'truck',
+        # Animals
+        'dog', 'cat', 'bird',
+        # Street furniture & obstacles
+        'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench',
+        # Everyday indoor items
+        'chair', 'couch', 'dining table', 'bed',
+        'toilet', 'sink',
+        'refrigerator', 'oven', 'microwave',
+        'tv', 'laptop', 'cell phone',
+        # Portable objects the user may bump into
+        'bottle', 'cup', 'backpack', 'umbrella', 'handbag', 'suitcase',
+        'book', 'vase', 'potted plant',
+    }
+
+    def __init__(self, model_size='yolov8n.pt', allowed_classes=None):
+        """ Initialize the YOLOv8 model for object detection.
+        
+        Args:
+            model_size: YOLO model weight file to load.
+            allowed_classes: Optional set of class names to detect.
+                             Defaults to DEFAULT_ASSISTIVE_CLASSES.
+        """
         # 'n' is nano, meaning it's the fastest and smallest model. Perfect for real-time.
         print(f"Loading YOLO model {model_size}...")
         self.model = YOLO(model_size)
-        print("YOLO model loaded.")
+        self.allowed_classes = allowed_classes or self.DEFAULT_ASSISTIVE_CLASSES
+        print(f"YOLO model loaded. Tracking {len(self.allowed_classes)} object categories.")
 
     def process_frame(self, color_img, depth_img, confidence_threshold=0.5):
 
@@ -28,6 +56,10 @@ class ObstacleDetector:
             # Get class name (e.g., 'person', 'chair', 'car')
             cls_id = int(box.cls[0].item())
             class_name = self.model.names[cls_id]
+
+            # Skip classes not in the assistive whitelist
+            if class_name not in self.allowed_classes:
+                continue
             
             # Get bounding box coordinates [x1, y1, x2, y2]
             x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())

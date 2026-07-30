@@ -84,13 +84,15 @@ def main():
             grid_distance_flat = ai_grid_matrix.flatten().tolist()
             
 
+            # --- PROXIMITY ALERTS ---
+            # Soft fallback beep for obstacles not recognized by YOLO (walls, etc.)
             valid_depths = ai_grid_matrix[ai_grid_matrix > 0]
             if valid_depths.size > 0:
                 min_dist = np.min(valid_depths)
                 if min_dist < 500:
-                    audio.beep(frequency=1000, duration_ms=100) # Warn user with sound
+                    audio.beep(frequency=600, duration_ms=80)  # Soft tone
 
-
+            # --- FLOOR-DROP DETECTION (stairs, ledges, holes) ---
             floor_region = depth_img[floor_row_start:, :]
             floor_valid = floor_region[(floor_region > 0) & (floor_region < 6000)]
 
@@ -112,21 +114,32 @@ def main():
                 suspicious_ratio = (void_pixels + no_return_pixels) / floor_region.size
 
                 if suspicious_ratio > floor_void_ratio_thresh:
-                    audio.speak("Warning! Drop ahead.", force=False)
-
+                    audio.speak("Atenção! Desnível à frente.", force=False)
 
             # 2. RUN VISION AI 
 
             annotated_img, threats = vision.process_frame(color_img, depth_img)
             
-            # 3. CONTEXTUAL AUDIO WARNINGS
+            # 3. CONTEXTUAL AUDIO WARNINGS — Speak object name + distance
             for threat in threats:
-                # If a specific recognized object is closer than 1 meter (or 0 meaning extremely close)
                 dist_mm = threat['distance_mm']
-                if dist_mm > 0 and dist_mm < 500:
-                    audio.speak(f"Warning! {threat['label']} at {dist_mm/1000:.1f} meters.")
-                elif dist_mm == 0:
-                    audio.speak(f"Warning! {threat['label']} very close.")
+                name = threat['label']
+
+                if dist_mm == 0:
+                    audio.speak(
+                        f"Atenção! {name} muito perto.",
+                        cooldown_key=name
+                    )
+                elif dist_mm < 500:
+                    audio.speak(
+                        f"Cuidado! {name} a {dist_mm/1000:.1f} metros.",
+                        cooldown_key=name
+                    )
+                elif dist_mm < 1000:
+                    audio.speak(
+                        f"{name} a {dist_mm/1000:.1f} metros.",
+                        cooldown_key=name
+                    )
             
 
             for y, x in draw_points:
