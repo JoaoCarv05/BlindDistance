@@ -18,7 +18,7 @@ img_ptsL = []
 img_ptsR = []
 obj_pts = []
 
-for i in tqdm(range(1,28)):
+for i in tqdm(range(1,16)):
 	imgL = cv2.imread(pathL+"img%d.png"%i)
 	imgR = cv2.imread(pathR+"img%d.png"%i)
 	imgL_gray = cv2.imread(pathL+"img%d.png"%i,0)
@@ -58,34 +58,43 @@ new_mtxR, roiR= cv2.getOptimalNewCameraMatrix(mtxR,distR,(wR,hR),1,(wR,hR))
 
 
 print("Stereo calibration .....")
+
+# Em vez de fixar, usamos os valores individuais como um "chute inicial" muito bom
 flags = 0
-flags |= cv2.CALIB_FIX_INTRINSIC
+flags |= cv2.CALIB_USE_INTRINSIC_GUESS
 
-criteria_stereo= (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+criteria_stereo = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 1e-5) # Aumentei um pouco a precisão aqui
 
+# Passando mtxL e mtxR originais, não as "new_mtx"
+retS, mtxL_opt, distL_opt, mtxR_opt, distR_opt, Rot, Trns, Emat, Fmat = cv2.stereoCalibrate(
+    obj_pts,
+    img_ptsL,
+    img_ptsR,
+    mtxL,    # <-- Matriz original
+    distL,
+    mtxR,    # <-- Matriz original
+    distR,
+    imgL_gray.shape[::-1],
+    criteria_stereo,
+    flags
+)
 
+# Agora usamos as matrizes otimizadas pelo stereoCalibrate para retificar
+rectify_scale = 1 
+rect_l, rect_r, proj_mat_l, proj_mat_r, Q, roiL, roiR = cv2.stereoRectify(
+    mtxL_opt, distL_opt, mtxR_opt, distR_opt,
+    imgL_gray.shape[::-1], Rot, Trns,
+    rectify_scale, (0,0)
+)
 
-retS, new_mtxL, distL, new_mtxR, distR, Rot, Trns, Emat, Fmat = cv2.stereoCalibrate(obj_pts,
-                                                          img_ptsL,
-                                                          img_ptsR,
-                                                          new_mtxL,
-                                                          distL,
-                                                          new_mtxR,
-                                                          distR,
-                                                          imgL_gray.shape[::-1],
-                                                          criteria_stereo,
-                                                          flags)
-
-rectify_scale= 1 
-rect_l, rect_r, proj_mat_l, proj_mat_r, Q, roiL, roiR= cv2.stereoRectify(new_mtxL, distL, new_mtxR, distR,
-                                                 imgL_gray.shape[::-1], Rot, Trns,
-                                                 rectify_scale,(0,0))
-
-
-Left_Stereo_Map= cv2.initUndistortRectifyMap(new_mtxL, distL, rect_l, proj_mat_l,
-                                             imgL_gray.shape[::-1], cv2.CV_16SC2)
-Right_Stereo_Map= cv2.initUndistortRectifyMap(new_mtxR, distR, rect_r, proj_mat_r,
-                                              imgR_gray.shape[::-1], cv2.CV_16SC2)
+Left_Stereo_Map = cv2.initUndistortRectifyMap(
+    mtxL_opt, distL_opt, rect_l, proj_mat_l,
+    imgL_gray.shape[::-1], cv2.CV_16SC2
+)
+Right_Stereo_Map = cv2.initUndistortRectifyMap(
+    mtxR_opt, distR_opt, rect_r, proj_mat_r,
+    imgR_gray.shape[::-1], cv2.CV_16SC2
+)
 
 
 print("Saving parameters ......")

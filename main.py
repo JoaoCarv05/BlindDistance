@@ -85,31 +85,30 @@ def main():
             
 
             # --- PROXIMITY ALERTS ---
-            # Soft fallback beep for obstacles not recognized by YOLO (walls, etc.)
             valid_depths = ai_grid_matrix[ai_grid_matrix > 0]
             if valid_depths.size > 0:
                 min_dist = np.min(valid_depths)
                 if min_dist < 500:
                     audio.beep(frequency=600, duration_ms=80)  # Soft tone
 
-            # --- FLOOR-DROP DETECTION (stairs, ledges, holes) ---
+            # --- FLOOR-DROP DETECTION ---
             floor_region = depth_img[floor_row_start:, :]
             floor_valid = floor_region[(floor_region > 0) & (floor_region < 6000)]
 
             if floor_valid.size > 0:
                 floor_current_median = float(np.median(floor_valid))
 
-                # Initialise or update the exponential moving average baseline
+
                 if floor_baseline is None:
                     floor_baseline = floor_current_median
                 else:
                     floor_baseline = (floor_ema_alpha * floor_current_median
                                       + (1 - floor_ema_alpha) * floor_baseline)
 
-                # Pixels that are MUCH deeper than the flat-floor baseline signal a void
+
                 void_threshold = floor_baseline * floor_void_multiplier
                 void_pixels = np.sum(floor_region > void_threshold)
-                # Pixels with NO return (0) also indicate a void / hole out-of-range
+ 
                 no_return_pixels = np.sum(floor_region == 0)
                 suspicious_ratio = (void_pixels + no_return_pixels) / floor_region.size
 
@@ -120,7 +119,7 @@ def main():
 
             annotated_img, threats = vision.process_frame(color_img, depth_img)
             
-            # 3. CONTEXTUAL AUDIO WARNINGS — Speak object name + distance
+            # 3. CONTEXTUAL AUDIO WARNINGS
             for threat in threats:
                 dist_mm = threat['distance_mm']
                 name = threat['label']
