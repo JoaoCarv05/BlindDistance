@@ -1,19 +1,18 @@
-import pyttsx3
 import threading
 import time
 import queue
 import pygame
 import numpy as np
 
-class AudioFeedback:
-    # Voice ids/names containing any of these are preferred for Portuguese speech
-    PT_VOICE_HINTS = ('pt_br', 'pt-br', 'ptbr', 'portug', 'brazil', 'maria', 'daniel', 'helo')
+from utils.tts import create_backend
 
-    def __init__(self, speech_rate=180):
-        # The TTS engine is created inside the audio thread: on Windows (SAPI5)
+class AudioFeedback:
+    def __init__(self, speech_rate=180, verbose=True):
+        # The TTS backend is created inside the audio thread: on Windows (SAPI5)
         # the underlying COM object only works on the thread that created it.
         self.speech_rate = speech_rate
-        self.tts_engine = None
+        self.verbose = verbose
+        self.tts_backend = None
 
         pygame.mixer.init()
         
@@ -107,44 +106,24 @@ class AudioFeedback:
         except Exception as e:
             print(f"Audio Beep Error: {e}")
 
-    def _init_engine(self):
-        engine = pyttsx3.init()
-        engine.setProperty('rate', self.speech_rate)
-
-        try:
-            voices = engine.getProperty('voices')
-        except Exception:
-            voices = []
-
-        for voice in voices:
-            languages = getattr(voice, 'languages', None) or []
-            lang_text = ' '.join(str(lang) for lang in languages)
-            haystack = f"{getattr(voice, 'id', '')} {getattr(voice, 'name', '')} {lang_text}".lower()
-            if any(hint in haystack for hint in self.PT_VOICE_HINTS):
-                engine.setProperty('voice', voice.id)
-                print(f"TTS voice: {getattr(voice, 'name', voice.id)}")
-                break
-        else:
-            print("WARNING: no Portuguese TTS voice found; "
-                  "install a pt-BR voice for correct pronunciation.")
-
-        return engine
-
     def _audio_loop(self):
         while self.running:
             try:
                 # Block until a message is received, timeout occasionally to check self.running
                 msg = self.message_queue.get(timeout=0.5)
-                if self.tts_engine is None:
-                    self.tts_engine = self._init_engine()
-                self.tts_engine.say(msg)
-                self.tts_engine.runAndWait()
+                if self.tts_backend is None:
+                    self.tts_backend = create_backend(rate=self.speech_rate)
+                    if self.tts_backend is None:
+                        continue
+                if self.verbose:
+                    print(f"[FALA] {msg}")
+                self.tts_backend.speak(msg)
             except queue.Empty:
                 pass
             except Exception as e:
                 print(f"Audio Thread Error: {e}")
-                # A failed engine stays broken, so rebuild it for the next message
-                self.tts_engine = None
+                # A failed backend stays broken, so rebuild it for the next message
+                self.tts_backend = None
 
     def stop(self):
         self.running = False
@@ -152,10 +131,10 @@ class AudioFeedback:
             self.audio_thread.join(timeout=1.0)
         pygame.mixer.quit()
 
-# Simple test if run directly
+# Simple test if run directly: python -m utils.audio_feedback
 if __name__ == '__main__':
     audio = AudioFeedback()
     audio.beep(frequency=1000)
-    audio.speak("Testing audio module", force=True)
-    time.sleep(2)
+    audio.speak("Celular a um metro e meio.", force=True)
+    time.sleep(5)
     audio.stop()

@@ -120,6 +120,10 @@ def main():
             annotated_img, threats = vision.process_frame(color_img, depth_img)
             
             # 3. CONTEXTUAL AUDIO WARNINGS
+            if threats:
+                print("[DETECTADO] " + ", ".join(
+                    f"{t['label_pt']} ({t['distance_mm']}mm)" for t in threats))
+
             for threat in threats:
                 dist_mm = threat['distance_mm']
                 name = threat['label_pt']
