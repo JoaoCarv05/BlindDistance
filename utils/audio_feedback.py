@@ -7,7 +7,7 @@ import numpy as np
 from utils.tts import create_backend
 
 class AudioFeedback:
-    def __init__(self, speech_rate=180, verbose=True):
+    def __init__(self, speech_rate=180, verbose=True, beep_cooldown=1.5):
         # The TTS backend is created inside the audio thread: on Windows (SAPI5)
         # the underlying COM object only works on the thread that created it.
         self.speech_rate = speech_rate
@@ -28,9 +28,10 @@ class AudioFeedback:
         # Per-object cooldown: e.g., 'person' won't block 'chair' from speaking
         self._object_cooldowns = {}  # {cooldown_key: last_spoken_time}
 
-        # Rate limiting for beeps (max 5 per second to avoid overloading pygame)
+        # Beeps are secondary to speech: keep them sparse so they don't talk over it
         self.last_beep_time = 0.0
-        self.beep_cooldown = 0.2
+        self.beep_cooldown = beep_cooldown
+        self._speaking = False
         
         # We also want a generic beep for low-level proximity alerts
         # self.beep_sound = self._generate_beep() 
@@ -75,8 +76,15 @@ class AudioFeedback:
                     except queue.Empty:
                         pass
 
+    def is_speaking(self):
+        """ True while a message is being spoken or is still queued. """
+        return self._speaking or not self.message_queue.empty()
+
     def beep(self, frequency=800, duration_ms=200):
         """ Play a simple tone. Higher frequency or shorter duration feels more urgent. """
+        if self.is_speaking():
+            return
+
         now = time.time()
         if now - self.last_beep_time < self.beep_cooldown:
             return
@@ -117,10 +125,13 @@ class AudioFeedback:
                         continue
                 if self.verbose:
                     print(f"[FALA] {msg}")
+                self._speaking = True
                 self.tts_backend.speak(msg)
+                self._speaking = False
             except queue.Empty:
                 pass
             except Exception as e:
+                self._speaking = False
                 print(f"Audio Thread Error: {e}")
                 # A failed backend stays broken, so rebuild it for the next message
                 self.tts_backend = None
