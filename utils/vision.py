@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
+from utils.labels import to_pt
+
 class ObstacleDetector:
     # Curated whitelist of COCO classes relevant for assistive navigation.
     # YOLOv8n detects all 80 COCO classes; we filter to only report useful ones.
@@ -81,6 +83,7 @@ class ObstacleDetector:
             
             threats.append({
                 'label': class_name,
+                'label_pt': to_pt(class_name),
                 'distance_mm': distance_mm,
                 'bbox': (x1, y1, x2, y2)
             })
