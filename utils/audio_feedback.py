@@ -6,14 +6,19 @@ import pygame
 import numpy as np
 
 class AudioFeedback:
-    def __init__(self):
-        # Initialize TTS Engine
-        self.tts_engine = pyttsx3.init()
-        self.tts_engine.setProperty('rate', 180)
-        
+    # Voice ids/names containing any of these are preferred for Portuguese speech
+    PT_VOICE_HINTS = ('pt_br', 'pt-br', 'ptbr', 'portug', 'brazil', 'maria', 'daniel', 'helo')
+
+    def __init__(self, speech_rate=180):
+        # The TTS engine is created inside the audio thread: on Windows (SAPI5)
+        # the underlying COM object only works on the thread that created it.
+        self.speech_rate = speech_rate
+        self.tts_engine = None
+
         pygame.mixer.init()
         
-        self.message_queue = queue.Queue()
+        # Bounded so old announcements are dropped instead of piling up
+        self.message_queue = queue.Queue(maxsize=3)
         self.running = True
         self.audio_thread = threading.Thread(target=self._audio_loop, daemon=True)
         self.audio_thread.start()
@@ -59,14 +64,17 @@ class AudioFeedback:
             if not cooldown_key:
                 self.last_warning_time = current_time
             
-            # Drain the queue so we say the newest thing instead of lagging behind
-            while not self.message_queue.empty():
+            # Drop the oldest announcement when the queue is full instead of
+            # discarding everything that is still waiting to be spoken
+            while True:
                 try:
-                    self.message_queue.get_nowait()
-                except queue.Empty:
+                    self.message_queue.put_nowait(text)
                     break
-
-            self.message_queue.put(text)
+                except queue.Full:
+                    try:
+                        self.message_queue.get_nowait()
+                    except queue.Empty:
+                        pass
 
     def beep(self, frequency=800, duration_ms=200):
         """ Play a simple tone. Higher frequency or shorter duration feels more urgent. """
@@ -99,17 +107,44 @@ class AudioFeedback:
         except Exception as e:
             print(f"Audio Beep Error: {e}")
 
+    def _init_engine(self):
+        engine = pyttsx3.init()
+        engine.setProperty('rate', self.speech_rate)
+
+        try:
+            voices = engine.getProperty('voices')
+        except Exception:
+            voices = []
+
+        for voice in voices:
+            languages = getattr(voice, 'languages', None) or []
+            lang_text = ' '.join(str(lang) for lang in languages)
+            haystack = f"{getattr(voice, 'id', '')} {getattr(voice, 'name', '')} {lang_text}".lower()
+            if any(hint in haystack for hint in self.PT_VOICE_HINTS):
+                engine.setProperty('voice', voice.id)
+                print(f"TTS voice: {getattr(voice, 'name', voice.id)}")
+                break
+        else:
+            print("WARNING: no Portuguese TTS voice found; "
+                  "install a pt-BR voice for correct pronunciation.")
+
+        return engine
+
     def _audio_loop(self):
         while self.running:
             try:
                 # Block until a message is received, timeout occasionally to check self.running
                 msg = self.message_queue.get(timeout=0.5)
+                if self.tts_engine is None:
+                    self.tts_engine = self._init_engine()
                 self.tts_engine.say(msg)
                 self.tts_engine.runAndWait()
             except queue.Empty:
                 pass
             except Exception as e:
                 print(f"Audio Thread Error: {e}")
+                # A failed engine stays broken, so rebuild it for the next message
+                self.tts_engine = None
 
     def stop(self):
         self.running = False

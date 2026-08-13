@@ -122,23 +122,18 @@ def main():
             # 3. CONTEXTUAL AUDIO WARNINGS
             for threat in threats:
                 dist_mm = threat['distance_mm']
-                name = threat['label']
+                name = threat['label_pt']
+                dist_str = f"{dist_mm/1000:.1f}".replace('.', ',')
 
-                if dist_mm == 0:
-                    audio.speak(
-                        f"Atenção! {name} muito perto.",
-                        cooldown_key=name
-                    )
+                if dist_mm <= 0:
+                    # No valid depth reading: still announce what was recognized
+                    audio.speak(f"{name} à frente.", cooldown_key=name)
                 elif dist_mm < 500:
-                    audio.speak(
-                        f"Cuidado! {name} a {dist_mm/1000:.1f} metros.",
-                        cooldown_key=name
-                    )
+                    audio.speak(f"Atenção! {name} muito perto.", cooldown_key=name)
                 elif dist_mm < 1000:
-                    audio.speak(
-                        f"{name} a {dist_mm/1000:.1f} metros.",
-                        cooldown_key=name
-                    )
+                    audio.speak(f"Cuidado! {name} a {dist_str} metros.", cooldown_key=name)
+                else:
+                    audio.speak(f"{name} a {dist_str} metros.", cooldown_key=name)
             
 
             for y, x in draw_points:
