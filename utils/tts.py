@@ -63,6 +63,11 @@ class Pyttsx3Backend:
     def speak(self, text):
         self.engine.say(text)
         self.engine.runAndWait()
+        # Leaving the loop running makes the next runAndWait() hang or raise
+        try:
+            self.engine.endLoop()
+        except Exception:
+            pass
 
 
 class Sapi5Backend:
@@ -123,7 +128,7 @@ class PowerShellBackend:
     def speak(self, text):
         script = self.SCRIPT.format(text=text.replace("'", "''"))
         subprocess.run(['powershell', '-NoProfile', '-Command', script],
-                       check=True, capture_output=True)
+                       check=True, capture_output=True, timeout=30)
 
 
 class EspeakBackend:
@@ -143,26 +148,30 @@ class EspeakBackend:
         self.voice_name = f'pt-br ({os.path.basename(binary)})'
 
     def speak(self, text):
-        subprocess.run(self.command + [text], check=True, capture_output=True)
+        subprocess.run(self.command + [text], check=True, capture_output=True,
+                       timeout=30)
 
 
-BACKENDS = ([Pyttsx3Backend, Sapi5Backend, PowerShellBackend] if IS_WINDOWS
+# SAPI5 first on Windows: pyttsx3 wraps the same engine but is prone to
+# hanging on the second runAndWait()
+BACKENDS = ([Sapi5Backend, PowerShellBackend, Pyttsx3Backend] if IS_WINDOWS
             else [Pyttsx3Backend, EspeakBackend])
 
 
-def create_backend(rate=180, preferred=None):
+def create_backend(rate=180, preferred=None, exclude=()):
     """Build the first usable TTS backend.
 
     Args:
         rate: Speech rate in words per minute.
         preferred: Backend name to try first (also read from the
                    BLINDDISTANCE_TTS environment variable).
+        exclude: Backend names to skip, e.g. ones that already failed.
 
     Returns:
         A backend exposing speak(text), or None when every backend failed.
     """
     preferred = preferred or os.environ.get('BLINDDISTANCE_TTS')
-    candidates = list(BACKENDS)
+    candidates = [b for b in BACKENDS if b.name not in exclude]
     if preferred:
         candidates.sort(key=lambda b: b.name != preferred.lower())
 
