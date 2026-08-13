@@ -13,6 +13,8 @@ torchvision>=0.15.0
 # Audio
 pyttsx3>=2.90
 pygame>=2.6.0
+# Windows: direct SAPI5 fallback when pyttsx3 fails to speak
+pywin32>=306; sys_platform == 'win32'
 
 # Utilities
 scipy>=1.10.0
