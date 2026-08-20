@@ -1,0 +1,15 @@
+graph TD
+    CAL["Calibracao offline: 27 pares 8x6 -> R, T, Q, mapas de remap"] --> RET
+    CAM["2 webcams USB 640x480"] --> RET["Retificacao (cv2.remap)"]
+    RET --> SGBM["StereoSGBM 3WAY + WLS opcional"]
+    SGBM --> DEPTH["Profundidade Z = f B / d -> depth_mm"]
+    RET --> YOLO["YOLOv8n + whitelist de classes assistivas"]
+    DEPTH --> YOLO
+    YOLO --> SPEAK["Fala: rotulo + distancia"]
+    DEPTH --> GRID["Grade 20x20 px: min_dist < 500 mm"]
+    DEPTH --> FLOOR["Piso: mediana + EMA; Z > 1,5 x base ou Z = 0"]
+    GRID --> BEEP["Bipe 600 Hz"]
+    FLOOR --> WARN["Fala: desnivel a frente"]
+    SPEAK --> AUD["Fila limitada + thread de audio + watchdog de TTS"]
+    BEEP --> AUD
+    WARN --> AUD
